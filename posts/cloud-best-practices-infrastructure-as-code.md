@@ -127,3 +127,7 @@ Pour supprimer cette stack et l'instance EC2 associé, une nouvelle ligne de com
 **Vous êtes maintenant pret à créer vos propres templates et déployer vos premières stack !**
 
 J'espère que cet article vous aura été utile, dans le prochain nous créérons étape par étape un un template permettant de déployer toute la configuration réseau standard d'un nouveau VPC pouvant ensuite servir pour n'importe quel type d'infrastructure.
+
+<br><br><br><br>
+
+[Home](/)
