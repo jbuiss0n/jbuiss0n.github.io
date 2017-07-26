@@ -1,6 +1,6 @@
 # AWS Best practices: Infrastructure as Code
 
-> Dans cet article nous allons l'un des principales bonnes pratique en terme de Cloud Computing à prendre en main le plus rapidement possible: Infrastructure as Code, ou comment scripter la création, la gestion et la configuration de vos infrastructure Cloud.
+> Dans cet article je vais aborder l'une des principales bonnes pratique en terme de Cloud Computing, à prendre en main le plus tôt possible: Infrastructure as Code, ou comment scripter la création, la gestion et la configuration de vos infrastructure Cloud.
 
 Parmis les nombreuses façon possible de faire de gérer et organiser ses infrastucture, une seule peu prétendre être **la** bonne pratique: le Script.
 
