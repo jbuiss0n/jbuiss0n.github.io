@@ -8,5 +8,5 @@ J'ai à coeur de partager mes connaissances et d'échanger des feedbacks et autr
 
 # Last posts
 
-### [AWS Best practices: Infrastructure as Code](posts/cloud-best-practices-IAC)
-> Dans cet article je vais aborder l'une des principales bonnes pratique en terme de Cloud Computing, à prendre en main le plus tôt possible: Infrastructure as Code, ou comment scripter la création, la gestion et la configuration de vos infrastructure Cloud.
+### 2017-07-28 [AWS Best practices: Infrastructure as Code](posts/cloud-best-practices-infrastructure-as-code)
+> Dans cet article je vais aborder l'une des principales bonnes pratique en terme de Cloud Computing, et à prendre en main le plus tôt possible: Infrastructure as Code, ou comment scripter la création, la gestion et la configuration de vos Infrastructure Cloud. [Lire plus...](cloud-best-practices-infrastructure-as-code)
