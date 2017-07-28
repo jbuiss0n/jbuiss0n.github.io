@@ -10,5 +10,8 @@ J'ai à coeur de partager mes connaissances et d'échanger des feedbacks et autr
 
 # Last Posts
 
-### 2017-07-28 [[AWS] Infrastructure As Code: Pourquoi et Comment?](posts/aws-infrastructure-as-code)
+### 2017-07-28 [AWS Cloudformation: Création d'un Infrastucture réseau complète](posts/aws-cloudformation-netword)
+> Dans cet article je vous propose de réaliser un template CloudFormation permettant de déployer très simplement un réseau VPC standard embarquant toute la configuration nécessaire et standarisé pour n'importe quelle infrastructure, ce qui est souvent désigné sous l'appelation: **NetWord**. [Lire plus...](posts/aws-cloudformation-netword)
+
+### 2017-07-28 [[AWS] Infrastructure As Code: Pourquoi et Comment ?](posts/aws-infrastructure-as-code)
 > Dans cet article je vais aborder l'une des principales bonnes pratique en termes de Cloud Computing, à prendre en main le plus tôt possible : **Infrastructure as Code**, ou comment scripter la création, la gestion et la configuration de vos infrastructure Cloud. [Lire plus...](posts/aws-infrastructure-as-code)
