@@ -99,7 +99,7 @@ Je ne vais pas aller dans le détails de chaque propriétés, comme je l'ai déj
 
 Ce qui nous intéresse tout particulièrement ici sont les propriétés : `Parameters`, qui comme son nom l'indique vont nous permettre de configurer les paramètres de notre template comme la région, le nom des ressources, etc... Ainsi que la propriété `Resources` qui vas nous permettre de définitr un à un les services et leurs configurations que nous voulons mettre en place.
 
-Commençons immédiatement notre script avec une simple Instance EC2 configurée pour héberger une application web.
+Commençons immédiatement notre script avec une simple Instance EC2:
 
 ```json
 {
@@ -116,13 +116,13 @@ Commençons immédiatement notre script avec une simple Instance EC2 configurée
     }
 }
 ```
-Et pour déployer cette stack vous n'avez plus qu'à exécuter cette ligne de commande :
-> `aws cloudformation deploy --template-file web-app.template --stack-name web-app`
+Une fois mon template enregistré *simple-ec2.template* nous pouvons déployer cette stack en éxécutant cette ligne de commande:
+> `aws cloudformation deploy --template-file simple-ec2.template --stack-name simple-ec2`
 
 Vous pouvez suivre l'évolution de la création de la stack dans votre [console AWS](https://console.aws.amazon.com/cloudformation/home), et vous devriez voir également apparaitre votre instance `Running` dans la [section EC2 de la console](https://console.aws.amazon.com/ec2/v2/home), félicitations vous venez d'entrer dans le monde de l'Infrastructure as Code !
 
 Pour supprimer cette stack et l'instance EC2 associé, une nouvelle ligne de commande fera le tout pour vous :
-> `aws cloudformation delete-stack --stack-name web-app`
+> `aws cloudformation delete-stack --stack-name simple-ec2`
 
 Si vous utilisez Visual Studio, vous pouvez aussi simplement faire un clic droit sur le fichier dans l'explorateur de Solution et choisir `Deploy to AWS cloudformation` et vous laissez guider. Mais encore une fois, je vous conseil de vous habituer aux lignes de commande, que vous pourrez facilement versionner, réutiliser, automatiser...
 
@@ -160,7 +160,7 @@ Notre précédent template est très bien pour servir d'exemple mais ne correspo
 Dans notre cas cela signifie que l'instance déjà deployée sera **détruite** et qu'une nouvelle instance sera créée. Soyez toujours vigilant et vérifiez le comportant des propriétés que vous modifiées via la docs, afin d'anticiper le comportement d'un update. Dans le cas de [`KeyName`](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html#cfn-ec2-instance-keyname) et [`NetworkInterfaces`](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html#cfn-ec2-instance-networkinterfaces), on peut voir `Update requires: Replacement` qui nous renvoie vers [cette explication](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks-update-behaviors.html#update-replacement). L'instance sera donc fraichement recréé à partir de zéro à la modification des ces propriétés.
 
 Avec ce comportement en tête, mettons à jour notre stack, en utilisant la même commande que leur de sa création:
-> `aws cloudformation deploy --template-file web-app.template --stack-name web-app --region eu-central-1`
+> `aws cloudformation deploy --template-file simple-ec2.template --stack-name simple-ec2 --region eu-central-1`
 
 Notre template commence à ressemble à quelques chose de viable, on peut par exemple maintenant s'y connecter via SSH:
 > `ssh -i /CHEMIN/VERS/VOTRE/KEYPAIR.pem ec2-user@IP_PUBLIQUE_DE_LINSTANCE`
@@ -237,7 +237,7 @@ Nous utilisons également le [pseudo paramètre](http://docs.aws.amazon.com/AWSC
 Enfin, nous utilisons également une [fonction intrinsèque](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference.html) qui nous permet de concaténer des valeurs pour former une chaine de caractère. Dans notre cas nous nous en servant pour définir le nom de notre instance en fonctionn de plusieurs paramètres du template, via le `Tag Name`.
 
 C'est déjà beaucoup mieux, ils nous suffit maintenant de spécifier nos paramètres via l'habituelle ligne de commande pour mettre à jour notre stack:
-> `aws cloudformation deploy --template-file web-app.template --stack-name web-app --region eu-central-1 --parameter-overrides SecurityGroupIds=sg-XXXX,sg-XXXX SubnetId=subnet-XXXX ImageId=ami-82be18ed InstanceType=t2.micro KeyName=XXXX Owner=jbuiss0n Project=webapp Environment=test`
+> `aws cloudformation deploy --template-file simple-ec2.template --stack-name simple-ec2 --region eu-central-1 --parameter-overrides SecurityGroupIds=sg-XXXX,sg-XXXX SubnetId=subnet-XXXX ImageId=ami-82be18ed InstanceType=t2.micro KeyName=XXXX Owner=jbuiss0n Project=simple-ec2 Environment=test`
 
 Notre template s'éxécute donc avec les valeurs suivantes, que vous pouvez remplacer à volonté en éxecutant ce même template pour créer plusieurs stack:
 - `SecurityGroupIds` = sg-XXXX,sg-XXXX *(à vous de compléter ce paramètres en fonction de votre configuration AWS et de votre VPC)*
@@ -246,12 +246,12 @@ Notre template s'éxécute donc avec les valeurs suivantes, que vous pouvez remp
 - `InstanceType` = t2.micro
 - `KeyName` = XXXX *(à vous de compléter ce paramètres en fonction de votre configuration AWS et de votre VPC)*
 - `Owner` = jbuiss0n
-- `Project` = webapp
+- `Project` = simple-ec2
 - `Environment` = test
 
 Ce qui une fois correctement déployer nous donne par exemple les `Tags` suivant sur notre instance:
-- `Name` = ec2.jbuiss0n.webapp.test
-- `Stack` = web-app
+- `Name` = ec2.jbuiss0n.simple-ec2.test
+- `Stack` = simple-ec2
 - `Environment` = test
 
 *Vous pouvez également constater l'éxistance de `Tags` généré directement par cloudformation dans la console.*
@@ -269,7 +269,7 @@ Il y a une vrai progression, mais au final le deploiement d'une nouvelle stack �
         },
         "Project": {
             "Type": "String",
-            "Default": "webapp"
+            "Default": "simple-ec2"
         },
         "Environment": {
             "Type": "String",
@@ -397,7 +397,7 @@ Quelques explication sur ce nouveau template:
 - La propriété `InstanceType`: nous allons dans les `Environments` le type d'instance en fonction du paramètre `Environment`, ayant lui même une valeur par défaut à "test".
 
 Il n'y a plus qu'a éxécuter notre nouvelle commande, maintenant beaucoup plus simplement:
-> `aws cloudformation deploy --template-file web-app.template --stack-name web-app --region eu-central-1 --parameter-overrides SecurityGroupIds=sg-XXXX SubnetId=subnet-XXXX`
+> `aws cloudformation deploy --template-file simple-ec2.template --stack-name simple-ec2 --region eu-central-1 --parameter-overrides SecurityGroupIds=sg-XXXX SubnetId=subnet-XXXX`
 
 **Vous êtes maintenant pret à créer vos propres templates et déployer vos premières stack !**
 
