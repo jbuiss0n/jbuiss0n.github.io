@@ -68,7 +68,7 @@ En plus du très bon plugin [AWS Toolkit for pour Visual Studio](https://aws.ama
 > Attention si vous utilisez le `Dark theme` sous VS2015, une petite modification de couleur vous sera nécessaire pour rendre lisible vos templates. Allez dans `Tools` > `Options` > `Environment` > `Fonts and Colors`, et reconfigurez les couleurs pour les propriétés commençant par `CloudFormation Template` qui ne sont pas lisible.
 
 Une fois votre IDE configuré selon vos besoins, il ne vous manque plus qu'a installer l'[AWS CLI](https://aws.amazon.com/fr/cli/) si ce n'est pas déjà fait. Vous pourriez utiliser la console pour déployer vos templates, mais comme déjà évoqué plus haut, vous devriez tout de suite vous habituer à vous en passer.
-L'**AWS CLI** installée, n'oubliez pas de la configurer, pour cela vous pouvez suivre une fois encore la [très bonne documentation qui l'accompagne](http://docs.aws.amazon.com/fr_fr/cli/latest/userguide/cli-chap-getting-started.html#cli-quick-configuration).
+L'**AWS CLI** installée, n'oubliez pas de la configurer, pour cela vous pouvez suivre une fois encore la [très bonne documentation qui l'accompagne](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-quick-configuration).
 
 Maintenant prêt, il ne vous reste plus qu'a créer votre premier template en créant un nouveau projet CloudFormation: `File` > `New` > `Project` > `AWS` > `AWS CloudFormation Project`.
 
@@ -124,9 +124,284 @@ Vous pouvez suivre l'évolution de la création de la stack dans votre [console 
 Pour supprimer cette stack et l'instance EC2 associé, une nouvelle ligne de commande fera le tout pour vous :
 > `aws cloudformation delete-stack --stack-name web-app`
 
+Si vous utilisez Visual Studio, vous pouvez aussi simplement faire un clic droit sur le fichier dans l'explorateur de Solution et choisir `Deploy to AWS cloudformation` et vous laissez guider. Mais encore une fois, je vous conseil de vous habituer aux lignes de commande, que vous pourrez facilement versionner, réutiliser, automatiser...
+
+### Créer un template paramétrable et réutilisable
+
+Notre précédent template est très bien pour servir d'exemple mais ne correspond en aucun cas à quelques chose que vous feriez dans la vrai vie. Nous allons donc ajouter différentes options pour le rendre plus proche d'un véritable cas d'utilisation. Pour cela, je vais commencer par définir l'interface réseau de cette instance, en lui assignant une IP publique, un `Subnet` ainsi qu'un `Security Group`. Nous allons également lui donner le nom d'une `KeyPair` nous permettant de nous connecter en SSH. *Si vous n'avez pas encore de `KeyPair` la documentation vous expliquera tout le nécessaire [ici](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html).*
+
+```json
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Simple AWS Linux instances",
+    "Resources": {
+       "StaticWebAppInstance" : {
+           "Type" : "AWS::EC2::Instance",
+           "Properties" : {
+               "ImageId" : "ami-82be18ed",
+               "InstanceType" : "t2.micro",
+               "KeyName" : "XXXXX",    
+               "NetworkInterfaces": [
+					{
+						"DeviceIndex": "0",
+						"AssociatePublicIpAddress": "true",
+						"GroupSet": ["sg-XXXXX"],
+						"SubnetId": "subnet-XXXXX"
+					}
+				]
+           }
+       }
+    }
+}
+```
+*A vous de remplire les valeurs pour les propriétés `KeyName`, `GroupSet` et `SubnetId`, vous pouvez pour cela utiliser le VPC par défaut ainsi que le SecurityGroup par défaut de la région. Attention cependant à bien vous donner les accès nécessaires.*
+
+> Avant de mettre à jour notre template, il y a une chose **très importante** à savoir: La modification de certaines propriétés entraine un re-création de toute la ressource.
+Dans notre cas cela signifie que l'instance déjà deployée sera **détruite** et qu'une nouvelle instance sera créée. Soyez toujours vigilant et vérifiez le comportant des propriétés que vous modifiées via la docs, afin d'anticiper le comportement d'un update. Dans le cas de [`KeyName`](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html#cfn-ec2-instance-keyname) et [`NetworkInterfaces`](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html#cfn-ec2-instance-networkinterfaces), on peut voir `Update requires: Replacement` qui nous renvoie vers [cette explication](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks-update-behaviors.html#update-replacement). L'instance sera donc fraichement recréé à partir de zéro à la modification des ces propriétés.
+
+Avec ce comportement en tête, mettons à jour notre stack, en utilisant la même commande que leur de sa création:
+> `aws cloudformation deploy --template-file web-app.template --stack-name web-app --region eu-central-1`
+
+Notre template commence à ressemble à quelques chose de viable, on peut par exemple maintenant s'y connecter via SSH:
+> `ssh -i /CHEMIN/VERS/VOTRE/KEYPAIR.pem ec2-user@IP_PUBLIQUE_DE_LINSTANCE`
+
+Cependant ce template ne fonctionne que pour un VPC en particulier, dans une zone en particulier, n'est pas très explicite, et difficilement ré-utilisable hors de son contexte de création bien définit. Nous allons donc ajouter quelques paramètres.
+
+```json
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Simple AWS Linux instances",
+    "Parameters": {
+        "Owner": {
+            "Type": "String"
+        },
+        "Project": {
+            "Type": "String"
+        },
+        "Environment": {
+            "Type": "String"
+        },
+        "SecurityGroupIds" : {
+            "Type" : "List<AWS::EC2::SecurityGroup::Id>"
+        },
+        "SubnetId" : {
+            "Type" : "AWS::EC2::Subnet::Id"
+        },
+        "ImageId" : {
+            "Type" : "AWS::EC2::Image::Id"
+        },
+        "InstanceType" : {
+            "Type" : "String"
+        },
+        "KeyName" : {
+            "Type" : "String"
+        }
+    },
+    "Resources": {
+       "StaticWebAppInstance" : {
+           "Type" : "AWS::EC2::Instance",
+           "Properties" : {
+               "ImageId" : { "Ref" : "ImageId" },
+               "InstanceType" : { "Ref" : "InstanceType" },
+               "KeyName" : { "Ref" : "KeyName" },    
+               "NetworkInterfaces": [    
+                    {
+                        "DeviceIndex": "0",
+                        "AssociatePublicIpAddress": "true",
+                        "GroupSet": { "Ref" : "SecurityGroupIds" },
+                        "SubnetId": { "Ref" : "SubnetId" }
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Join": [".", ["ec2", { "Ref": "Owner" }, { "Ref": "Project" }, { "Ref": "Environment" }]] }
+                    },
+                    {
+                        "Key": "Stack",
+                        "Value": { "Ref": "AWS::StackName" }
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": { "Ref": "Environment" }
+                    }
+                ]
+           }
+       }
+    }
+}
+```
+
+Nous avons définit toute une série de `Parameters`, que nous utilisons ensuite via l'instruction `{ "Ref" : "XXXXX" }`. Cette instruction nous permet de faire une substitution avec la valeurs de ce paramètre. Cette instruction peut également servir de référence vers une autre `Resource` du template si nous avions des dépendances.
+Nous utilisons également le [pseudo paramètre](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/pseudo-parameter-reference.html) `AWS::StackName`. Les pseudo paramètre ne sont autres que des paramètres directement définit par CloudFormation lors de l'éxécution du template.
+Enfin, nous utilisons également une [fonction intrinsèque](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference.html) qui nous permet de concaténer des valeurs pour former une chaine de caractère. Dans notre cas nous nous en servant pour définir le nom de notre instance en fonctionn de plusieurs paramètres du template, via le `Tag Name`.
+
+C'est déjà beaucoup mieux, ils nous suffit maintenant de spécifier nos paramètres via l'habituelle ligne de commande pour mettre à jour notre stack:
+> `aws cloudformation deploy --template-file web-app.template --stack-name web-app --region eu-central-1 --parameter-overrides SecurityGroupIds=sg-XXXX,sg-XXXX SubnetId=subnet-XXXX ImageId=ami-82be18ed InstanceType=t2.micro KeyName=XXXX Owner=jbuiss0n Project=webapp Environment=test`
+
+Notre template s'éxécute donc avec les valeurs suivantes, que vous pouvez remplacer à volonté en éxecutant ce même template pour créer plusieurs stack:
+- `SecurityGroupIds` = sg-XXXX,sg-XXXX *(à vous de compléter ce paramètres en fonction de votre configuration AWS et de votre VPC)*
+- `SubnetId` = sg-XXXX,sg-XXXX *(à vous de compléter ce paramètres en fonction de votre configuration AWS et de votre VPC)*
+- `ImageId` = ami-82be18ed
+- `InstanceType` = t2.micro
+- `KeyName` = XXXX *(à vous de compléter ce paramètres en fonction de votre configuration AWS et de votre VPC)*
+- `Owner` = jbuiss0n
+- `Project` = webapp
+- `Environment` = test
+
+Ce qui une fois correctement déployer nous donne par exemple les `Tags` suivant sur notre instance:
+- `Name` = ec2.jbuiss0n.webapp.test
+- `Stack` = web-app
+- `Environment` = test
+
+*Vous pouvez également constater l'éxistance de `Tags` généré directement par cloudformation dans la console.*
+
+Il y a une vrai progression, mais au final le deploiement d'une nouvelle stack à partir de ce template est aussi complexe que la création d'une instance à partir de l'instruction `aws ec2 create-instance [...]` de l'**AWS CLI**. Nous allons donc une nouvelle fois améliorer notre template, en incorporante notemment les notions de [`Mappings`](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html) et de [`Conditions`](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html), en définissant des paramètres par défaut, etc...
+
+```json
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Simple AWS Linux instances",
+    "Parameters": {
+        "Owner": {
+            "Type": "String",
+            "Default": "jbuiss0n"
+        },
+        "Project": {
+            "Type": "String",
+            "Default": "webapp"
+        },
+        "Environment": {
+            "Type": "String",
+            "Default": "test"
+        },
+        "SecurityGroupIds" : {
+            "Type" : "List<AWS::EC2::SecurityGroup::Id>"
+        },
+        "SubnetId" : {
+            "Type" : "AWS::EC2::Subnet::Id"
+        }
+    },
+    "Mappings" : {
+        "RegionMap" : {
+            "us-east-1": {
+                "AwsLinuxAmi" : "ami-a4c7edb2",
+                "Ec2KeyPair": ""
+            },
+            "us-east-2": {
+                "AwsLinuxAmi" : "ami-8a7859ef",
+                "Ec2KeyPair": ""
+            },
+            "us-west-1": { 
+                "AwsLinuxAmi" : "ami-327f5352",
+                "Ec2KeyPair": ""
+            },
+            "us-west-2": { 
+                "AwsLinuxAmi" : "ami-6df1e514",
+                "Ec2KeyPair": "XXXXX"
+            },
+            "eu-west-1": { 
+                "AwsLinuxAmi" : "ami-d7b9a2b1",
+                "Ec2KeyPair": "XXXXX" 
+            },
+            "eu-west-2": { 
+                "AwsLinuxAmi" : "ami-ed100689",
+                "Ec2KeyPair": "XXXXX" 
+            },
+            "ca-central-1": { 
+                "AwsLinuxAmi" : "ami-a7aa15c3",
+                "Ec2KeyPair": ""
+            },
+            "eu-central-1": { 
+                "AwsLinuxAmi" : "ami-82be18ed",
+                "Ec2KeyPair": "XXXXX"
+            },
+            "ap-southeast-1": { 
+                "AwsLinuxAmi" : "ami-77af2014",
+                "Ec2KeyPair": ""
+            },
+            "ap-southeast-2": { 
+                "AwsLinuxAmi" : "ami-10918173",
+                "Ec2KeyPair": ""
+            },
+            "ap-northeast-1": { 
+                "AwsLinuxAmi" : "ami-3bd3c45c",
+                "Ec2KeyPair": ""
+            },
+            "ap-northeast-2": { 
+                "AwsLinuxAmi" : "ami-e21cc38c",
+                "Ec2KeyPair": ""
+            },
+            "ap-south-1": { 
+                "AwsLinuxAmi" : "ami-47205e28",
+                "Ec2KeyPair": ""
+            },
+            "sa-east-1": { 
+                "AwsLinuxAmi" : "ami-87dab1eb",
+                "Ec2KeyPair": ""
+            }
+        },
+        "Environments": {
+            "prod": {
+                "InstanceType": "t2.medium"
+            },
+            "test": {
+                "InstanceType": "t2.micro"
+            }
+        }
+    },
+    "Conditions" : {
+        "HasEc2KeyPair" : { "Fn::Not" : [{ "Fn::Equals" : [{ "Fn::FindInMap" : ["RegionMap", { "Ref" : "AWS::Region" }, "Ec2KeyPair"] }, ""] }] }
+    },
+    "Resources": {
+       "StaticWebAppInstance" : {
+           "Type" : "AWS::EC2::Instance",
+           "Properties" : {
+               "ImageId" : { "Fn::FindInMap" : ["RegionMap", { "Ref" : "AWS::Region" }, "AwsLinuxAmi"] },
+               "KeyName" : { "Fn::If": ["HasEc2KeyPair", { "Fn::FindInMap" : ["RegionMap", { "Ref" : "AWS::Region" }, "Ec2KeyPair"] }, { "Ref" : "AWS::NoValue" }] },
+               "InstanceType" : { "Fn::FindInMap" : ["Environments", { "Ref" : "Environment" }, "InstanceType"] },
+               "NetworkInterfaces": [
+                    {
+                        "DeviceIndex": "0",
+                        "AssociatePublicIpAddress": "true",
+                        "GroupSet": { "Ref" : "SecurityGroupIds" },
+                        "SubnetId": { "Ref" : "SubnetId" }
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Join": [".", ["ec2", { "Ref": "Owner" }, { "Ref": "Project" }, { "Ref": "Environment" }]] }
+                    },
+                    {
+                        "Key": "Stack",
+                        "Value": { "Ref": "AWS::StackName" }
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": { "Ref": "Environment" }
+                    }
+                ]
+           }
+       }
+    }
+}
+```
+
+Notre template commence à prendre de nouvelles dimentions! Nous avons maintenant un `Mapping` "RegionMap", qui nous permet de spécifier l'`Amazon Linux AMI` de chaque région, ainsi que la `KeyPair` que vous auriez défini dans chaque région. Mieux encore, la `Condition` "HasEc2KeyPair" nous permet de définir si vous avez ou non une `KeyPair` dans la région en cours de déploiement et donc de la fournir ou non à l'instance lors de sa création. Nous avons également un `Mapping` "Environments", permettant de définir des configuration différente en fonction de l'environement correspond à la stack en cours. Enfin, nous avons aussi définit des valeurs par défaut pour certains paramètres.
+
+Quelques explication sur ce nouveau template:
+- La condition `HasEc2KeyPair`: nous déduisons si la valeur de `Ec2KeyPair`, pour la région en cours de déploiement, est différente d'une chaine de caractère vide.
+- La propriété `KeyName`: si la condition `HasEc2KeyPair` est vrai, nous allons chercher dans notre `RegionMap` définit plus haut cette clé. Sinon nous spécifions explicitement que nous ne voulons pas définir de valeur pour cette propriété via la constante `AWS::NoValue`.
+- La propriété `ImageId`: nous allons encore chercher dans notre `RegionMap`, la valeur de l'AMI correspondant à la région en cours de déploiement.
+- La propriété `InstanceType`: nous allons dans les `Environments` le type d'instance en fonction du paramètre `Environment`, ayant lui même une valeur par défaut à "test".
+
+Il n'y a plus qu'a éxécuter notre nouvelle commande, maintenant beaucoup plus simplement:
+> `aws cloudformation deploy --template-file web-app.template --stack-name web-app --region eu-central-1 --parameter-overrides SecurityGroupIds=sg-XXXX SubnetId=subnet-XXXX`
+
 **Vous êtes maintenant pret à créer vos propres templates et déployer vos premières stack !**
 
-J'espère que cet article vous aura été utile, dans le prochain nous créerons étape par étape un un template permettant de déployer toute la configuration réseau standard d'un nouveau VPC pouvant ensuite servir pour n'importe quel type d'infrastructure.
+J'espère que cet article vous aura été utile, il y a évidemment encore beaucoup de chose à dire et à faire sur la création des templates, mais cela fera l'objet d'un prochain article.
 
 <br><br><br><br>
 
